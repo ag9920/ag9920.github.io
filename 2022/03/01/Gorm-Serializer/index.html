@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222"><meta name="generator" content="Hexo 6.0.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/cmu_2.jpeg">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/cmu_2.jpeg">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.0.0/css/all.min.css" integrity="sha256-jTIdiMuX/e3DGJUGwl3pKSxuc6YOuqtJYkM0bGQESA4=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"ag9920.work","root":"/","images":"/images","scheme":"Gemini","darkmode":false,"version":"8.10.1","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":false,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"disqus","storage":true,"lazyload":false,"nav":{"disqus":{"text":"Load Disqus","order":-1}}},"stickytabs":true,"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"搜索...","empty":"没有找到任何搜索结果：${query}","hits_time":"找到 ${hits} 个搜索结果（用时 ${time} 毫秒）","hits":"找到 ${hits} 个搜索结果"}}</script><script src="/js/config.js"></script>
+
+    <meta name="description" content="近期观察到 gorm.io&#x2F;gorm 新增了一个由 jinzhu 亲自操刀，很强大的feature：Serializer。可能由于时间较紧，gorm的官方文档暂时还没有更新，自己先来尝个鲜。 示例场景先回顾一下以前我们是怎样定义 gorm model 的：  模型是标准的 struct，由 Go 的基本数据类型、实现了 Scanner 和 Valuer 接口的自定义类型及其指针或别名组成">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Gorm Serializer">
+<meta property="og:url" content="http://ag9920.work/2022/03/01/Gorm-Serializer/index.html">
+<meta property="og:site_name" content="AG9920">
+<meta property="og:description" content="近期观察到 gorm.io&#x2F;gorm 新增了一个由 jinzhu 亲自操刀，很强大的feature：Serializer。可能由于时间较紧，gorm的官方文档暂时还没有更新，自己先来尝个鲜。 示例场景先回顾一下以前我们是怎样定义 gorm model 的：  模型是标准的 struct，由 Go 的基本数据类型、实现了 Scanner 和 Valuer 接口的自定义类型及其指针或别名组成">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2022-03-01T03:40:35.000Z">
+<meta property="article:modified_time" content="2022-03-02T01:48:56.737Z">
+<meta property="article:author" content="Jin">
+<meta property="article:tag" content="gorm">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="http://ag9920.work/2022/03/01/Gorm-Serializer/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"zh-CN","comments":true,"permalink":"http://ag9920.work/2022/03/01/Gorm-Serializer/","path":"2022/03/01/Gorm-Serializer/","title":"Gorm Serializer"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>Gorm Serializer | AG9920</title>
+  
+
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <p class="site-title">AG9920</p>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">My Heart is in the work</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-1"><a class="nav-link" href="#%E7%A4%BA%E4%BE%8B%E5%9C%BA%E6%99%AF"><span class="nav-number">1.</span> <span class="nav-text">示例场景</span></a></li><li class="nav-item nav-level-1"><a class="nav-link" href="#%E4%BD%BF%E7%94%A8-Serializer-%E7%AE%80%E5%8C%96"><span class="nav-number">2.</span> <span class="nav-text">使用 Serializer 简化</span></a></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="Jin"
+      src="/images/my.jpeg">
+  <p class="site-author-name" itemprop="name">Jin</p>
+  <div class="site-description" itemprop="description">I have not come for what you hoped to do, I have come for what you did</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">10</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">3</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/ag9920" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;ag9920" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:alexgong7@outlook.com" title="E-Mail → mailto:alexgong7@outlook.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="back-to-top" role="button" aria-label="返回顶部">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://ag9920.work/2022/03/01/Gorm-Serializer/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/my.jpeg">
+      <meta itemprop="name" content="Jin">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="AG9920">
+      <meta itemprop="description" content="I have not come for what you hoped to do, I have come for what you did">
+    </span>
+    
+    <span hidden itemprop="post" itemscope itemtype="http://schema.org/CreativeWork">
+      <meta itemprop="name" content="Gorm Serializer | AG9920">
+      <meta itemprop="description" content="">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Gorm Serializer
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">发表于</span>
+
+      <time title="创建时间：2022-03-01 11:40:35" itemprop="dateCreated datePublished" datetime="2022-03-01T11:40:35+08:00">2022-03-01</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar-check"></i>
+      </span>
+      <span class="post-meta-item-text">更新于</span>
+      <time title="修改时间：2022-03-02 09:48:56" itemprop="dateModified" datetime="2022-03-02T09:48:56+08:00">2022-03-02</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">分类于</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/gorm/" itemprop="url" rel="index"><span itemprop="name">gorm</span></a>
+        </span>
+    </span>
+
+  
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>近期观察到 gorm.io&#x2F;gorm 新增了一个由 jinzhu 亲自操刀，很强大的feature：<strong>Serializer</strong>。可能由于时间较紧，gorm的官方文档暂时还没有更新，自己先来尝个鲜。</p>
+<h1 id="示例场景"><a href="#示例场景" class="headerlink" title="示例场景"></a>示例场景</h1><p>先回顾一下以前我们是怎样定义 gorm model 的：</p>
+<blockquote>
+<p>模型是标准的 struct，由 Go 的基本数据类型、实现了 Scanner 和 Valuer 接口的自定义类型及其指针或别名组成</p>
+<p>from  <a target="_blank" rel="noopener" href="https://gorm.io/zh_CN/docs/models.html">https://gorm.io/zh_CN/docs/models.html</a></p>
+</blockquote>
+<p>日常开发中，很多时候我会以 Go 基本数据类型为主来定义一个纯粹给 gorm 使用的 model，字段和数据表 schema 一一对应。比如我需要开发一个应用，业务上看需要将应用ID，配置存入数据库。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> Application <span class="keyword">struct</span> &#123;</span><br><span class="line">	gorm.Model</span><br><span class="line">	AppID  <span class="type">int64</span>  <span class="string">`gorm:&quot;column:app_id&quot; json:&quot;app_id&quot;`</span></span><br><span class="line">	Config <span class="type">string</span> <span class="string">`gorm:&quot;column:config&quot; json:&quot;config&quot;`</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<span id="more"></span>
+
+<p>这里的 Config 字段，对应到底层数据表是一个 text 类型，如下</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">`config` text <span class="keyword">COLLATE</span> utf8mb4_general_ci COMMENT <span class="string">&#x27;配置项&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p>但实际上，config 本身是一个 json 序列化的字符串，包含了这个应用的相关配置信息。</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> ApplicationConfig <span class="keyword">struct</span> &#123;</span><br><span class="line">	Name 				<span class="type">string</span></span><br><span class="line">	AvatarURL 	<span class="type">string</span>   </span><br><span class="line">	WebURL 			<span class="type">string</span>   </span><br><span class="line">&#125; </span><br></pre></td></tr></table></figure>
+
+<p>在实际存储数据时，我们会先把获取到的 ApplicationConfig 序列化为字符串，塞到 Application 的 Config 字段</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line">package main</span><br><span class="line"></span><br><span class="line">import (</span><br><span class="line">	&quot;encoding/json&quot;</span><br><span class="line">	&quot;log&quot;</span><br><span class="line">	&quot;os&quot;</span><br><span class="line">	&quot;time&quot;</span><br><span class="line"></span><br><span class="line">	&quot;gorm.io/driver/sqlite&quot;</span><br><span class="line">	&quot;gorm.io/gorm&quot;</span><br><span class="line">	&quot;gorm.io/gorm/logger&quot;</span><br><span class="line">)</span><br><span class="line"></span><br><span class="line">type Application struct &#123;</span><br><span class="line">	gorm.Model</span><br><span class="line">	AppID  int64  `gorm:&quot;column:app_id&quot; json:&quot;app_id&quot;`</span><br><span class="line">	Config string `gorm:&quot;column:config&quot; json:&quot;config&quot;`</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">type ApplicationConfig struct &#123;</span><br><span class="line">	Name      string</span><br><span class="line">	Desc      string</span><br><span class="line">	AvatarURL string</span><br><span class="line">	WebURL    string</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">func main() &#123;</span><br><span class="line">	// initialize gorm</span><br><span class="line">	newLogger := logger.New(</span><br><span class="line">		log.New(os.Stdout, &quot;\r\n&quot;, log.LstdFlags), // io writer</span><br><span class="line">		logger.Config&#123;</span><br><span class="line">			SlowThreshold:             time.Second, // Slow SQL threshold</span><br><span class="line">			LogLevel:                  logger.Info, // Log level</span><br><span class="line">			IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger</span><br><span class="line">			Colorful:                  true,        // Disable color</span><br><span class="line">		&#125;,</span><br><span class="line">	)</span><br><span class="line">	db, err := gorm.Open(sqlite.Open(&quot;:memory:&quot;), &amp;gorm.Config&#123;</span><br><span class="line">		Logger: newLogger,</span><br><span class="line">	&#125;)</span><br><span class="line">	if err != nil &#123;</span><br><span class="line">		panic(&quot;failed to connect database&quot;)</span><br><span class="line">	&#125;</span><br><span class="line">	// Migrate the schema</span><br><span class="line">	db.AutoMigrate(&amp;Application&#123;&#125;)</span><br><span class="line"></span><br><span class="line">	// Construct Biz Config</span><br><span class="line">	bizModel := &amp;ApplicationConfig&#123;</span><br><span class="line">		Name:      &quot;testName&quot;,</span><br><span class="line">		Desc:      &quot;testDesc&quot;,</span><br><span class="line">		AvatarURL: &quot;https://image.url&quot;,</span><br><span class="line">		WebURL:    &quot;http://test.web.url&quot;,</span><br><span class="line">	&#125;</span><br><span class="line">	val, _ := json.Marshal(bizModel)</span><br><span class="line"></span><br><span class="line">	// call gorm.DB.Create</span><br><span class="line">	db.Create(&amp;Application&#123;</span><br><span class="line">		AppID:  1,</span><br><span class="line">		Config: string(val),</span><br><span class="line">	&#125;)</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>执行demo后发现打印出的 INSERT 语句如下：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> `applications` (`created_at`,`updated_at`,`deleted_at`,`app_id`,`config`) <span class="keyword">VALUES</span> (&quot;2022-02-23 17:29:41.466&quot;,&quot;2022-02-23 17:29:41.466&quot;,<span class="keyword">NULL</span>,<span class="number">1</span>,&quot;&#123;\&quot;Name\&quot;:\&quot;testName\&quot;,\&quot;<span class="keyword">Desc</span>\&quot;:\&quot;testDesc\&quot;,\&quot;AvatarURL\&quot;:\&quot;https:<span class="operator">/</span><span class="operator">/</span>image.url\&quot;,\&quot;WebURL\&quot;:\&quot;http:<span class="operator">/</span><span class="operator">/</span>test.web.url\&quot;&#125;&quot;) RETURNING `id`</span><br></pre></td></tr></table></figure>
+
+<h1 id="使用-Serializer-简化"><a href="#使用-Serializer-简化" class="headerlink" title="使用 Serializer 简化"></a>使用 Serializer 简化</h1><p>从上面的例子可以看到，我们要做到将一个 json 字符串插入数据库，需要提前自行序列化，再通过为 gorm 定义的 model 来完成 Create 操作。</p>
+<p>有没有办法简化呢？有！Serializer 就是来帮你完成序列化相关操作的。</p>
+<p> 有了 Serializer，我们无需再将原有的序列化结构进行 json 序列化，再塞到 model中，而是直接在 model 中将需要序列化的字段加上 serializer tag。看下效果：</p>
+<p>原来的 Config 字段定义：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Config <span class="type">string</span> <span class="string">`gorm:&quot;column:config&quot; json:&quot;config&quot;`</span></span><br></pre></td></tr></table></figure>
+
+<p>改为</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Config *ApplicationConfig `gorm:&quot;column:config;serializer:json&quot; json:&quot;config&quot;`</span><br></pre></td></tr></table></figure>
+
+<p>原来的 Create 操作：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">bizModel := &amp;ApplicationConfig&#123;</span><br><span class="line">	Name:      <span class="string">&quot;testName&quot;</span>,</span><br><span class="line">	Desc:      <span class="string">&quot;testDesc&quot;</span>,</span><br><span class="line">	AvatarURL: <span class="string">&quot;https://image.url&quot;</span>,</span><br><span class="line">	WebURL:    <span class="string">&quot;http://test.web.url&quot;</span>,</span><br><span class="line">&#125;</span><br><span class="line">val, _ := json.Marshal(bizModel)</span><br><span class="line"></span><br><span class="line">db.Create(&amp;Application&#123;</span><br><span class="line">	AppID:  <span class="number">1</span>,</span><br><span class="line">   Config: <span class="type">string</span>(val),</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+
+<p>改为</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">db.Create(&amp;Application&#123;</span><br><span class="line">		AppID:  1,</span><br><span class="line">		Config: &amp;ApplicationConfig&#123;</span><br><span class="line">			Name:      &quot;testName&quot;,</span><br><span class="line">			Desc:      &quot;testDesc&quot;,</span><br><span class="line">			AvatarURL: &quot;https://image.url&quot;,</span><br><span class="line">			WebURL:    &quot;http://test.web.url&quot;,</span><br><span class="line">		&#125;,</span><br><span class="line">	&#125;)</span><br></pre></td></tr></table></figure>
+
+<p>这次生成的 INSERT语句如下：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> `applications` (`created_at`,`updated_at`,`deleted_at`,`app_id`,`config`) <span class="keyword">VALUES</span> (&quot;2022-02-23 17:42:59.57&quot;,&quot;2022-02-23 17:42:59.57&quot;,<span class="keyword">NULL</span>,<span class="number">1</span>,&quot;&#123;\&quot;Name\&quot;:\&quot;testName\&quot;,\&quot;<span class="keyword">Desc</span>\&quot;:\&quot;testDesc\&quot;,\&quot;AvatarURL\&quot;:\&quot;https:<span class="operator">/</span><span class="operator">/</span>image.url\&quot;,\&quot;WebURL\&quot;:\&quot;http:<span class="operator">/</span><span class="operator">/</span>test.web.url\&quot;&#125;&quot;) RETURNING `id`</span><br></pre></td></tr></table></figure>
+
+<p>gorm自动处理了json序列化的操作，生成的 INSERT语义跟原来的一模一样。从此再也不用拆分多个 model了，直接使用 serializer tag。</p>
+<p>不仅仅是单独的 struct 嵌套，serializer 还支持对 slice, map 进行序列化，进行序列化的方法也不限制于json，官方目前提供了 json, unixtime 的支持，同学们也可以自行提PR 支持更多序列化的方法。</p>
+<blockquote>
+<p>gorm 对于 serializer tag 的单测：<a target="_blank" rel="noopener" href="https://github.com/go-gorm/gorm/blob/master/tests/serializer_test.go">https://github.com/go-gorm/gorm/blob/master/tests/serializer_test.go</a></p>
+</blockquote>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/gorm/" rel="tag"># gorm</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2022/03/01/Golang-Reflect-%E7%94%A8%E6%B3%95/" rel="prev" title="Golang Reflect 用法">
+                  <i class="fa fa-chevron-left"></i> Golang Reflect 用法
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">Jin</span>
+</div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+</body>
+</html>
